@@ -1,2 +1,8 @@
+# Palma Vista local build output and editor droppings
 node_modules/
 out/
+dist/
+*.log
+.DS_Store
+screenshots/raw/
+# gta6-01 entry
