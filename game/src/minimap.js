@@ -212,3 +212,4 @@ export function createMinimap(canvas, city) {
 
   return { draw, drawFull, size, paint };
 }
+

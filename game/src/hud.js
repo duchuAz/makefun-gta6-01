@@ -270,3 +270,4 @@ export function createHUD() {
     setHint(text) { el.hint.textContent = text; },
   };
 }
+

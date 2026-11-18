@@ -452,3 +452,4 @@ export function createCombat(scene, city) {
     get activeCtx() { return activeCtx; },
   };
 }
+

@@ -305,3 +305,4 @@ export function stageShot(name, ctx) {
 }
 
 export { mapState };
+

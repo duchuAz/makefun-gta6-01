@@ -271,3 +271,4 @@ export function createWorld(canvas) {
 
   return { renderer, scene, camera, sun, hemi, sky, setMood, update, render, resize, get mood() { return moodName; } };
 }
+

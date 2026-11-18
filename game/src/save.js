@@ -122,3 +122,4 @@ export function eraseGame() {
     return false;
   }
 }
+
