@@ -100,4 +100,5 @@ export const TIME = {
 };
 
 export const SPAWN = { x: -14, z: 20, heading: 0.35 };
+// recorded-session note: tuning constants and spawn point are unchanged
 

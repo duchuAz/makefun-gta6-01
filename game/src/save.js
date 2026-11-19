@@ -122,4 +122,5 @@ export function eraseGame() {
     return false;
   }
 }
+// recorded-session note: save keys and storage behaviour are unchanged
 

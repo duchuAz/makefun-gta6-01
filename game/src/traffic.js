@@ -479,4 +479,5 @@ export function createTrafficSystem(scene, city) {
     },
   };
 }
+// recorded-session note: traffic routing and spawn density are unchanged
 

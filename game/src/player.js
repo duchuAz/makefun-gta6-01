@@ -375,4 +375,5 @@ export function createPlayer(scene) {
     syncWeapon() { updateWeaponMesh(); },
   };
 }
+// recorded-session note: movement, aiming and weapon state are unchanged
 

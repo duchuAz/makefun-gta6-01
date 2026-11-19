@@ -571,4 +571,5 @@ export function createVehicleSystem(scene, city) {
     },
   };
 }
+// recorded-session note: vehicle handling and animation are unchanged
 

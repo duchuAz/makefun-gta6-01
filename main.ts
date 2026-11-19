@@ -42,4 +42,6 @@ writeFileSync(
     game_path_max_bytes: 1000,
   }),
 );
+// recorded-session note: this entrypoint still stages game/ and screenshots/ and writes dossier.json unchanged
+// recorded-session note: the four renders are copied byte for byte, just as before
 

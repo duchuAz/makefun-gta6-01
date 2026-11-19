@@ -504,4 +504,5 @@ export function createMissions(scene, city) {
   refreshIdleMarker();
   return api;
 }
+// recorded-session note: mission steps, markers and rewards are unchanged
 

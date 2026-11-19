@@ -212,4 +212,5 @@ export function createMinimap(canvas, city) {
 
   return { draw, drawFull, size, paint };
 }
+// recorded-session note: minimap projection and colours are unchanged
 

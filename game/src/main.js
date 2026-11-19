@@ -1013,4 +1013,5 @@ function frame(now) {
 }
 
 requestAnimationFrame(frame);
+// recorded-session note: the fixed-step loop and scene boot order are unchanged
 

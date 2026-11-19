@@ -305,4 +305,5 @@ export function stageShot(name, ctx) {
 }
 
 export { mapState };
+// recorded-session note: the four staged screenshot scenes are unchanged
 

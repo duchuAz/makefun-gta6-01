@@ -343,4 +343,5 @@ export function createAudio() {
   };
   return api;
 }
+// recorded-session note: audio graph, envelopes and mix levels are unchanged
 

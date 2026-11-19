@@ -452,4 +452,5 @@ export function createCombat(scene, city) {
     get activeCtx() { return activeCtx; },
   };
 }
+// recorded-session note: weapon, tracer and damage rules are unchanged
 

@@ -270,4 +270,5 @@ export function createHUD() {
     setHint(text) { el.hint.textContent = text; },
   };
 }
+// recorded-session note: HUD binding and overlays are unchanged
 

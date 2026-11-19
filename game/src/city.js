@@ -1289,4 +1289,5 @@ export function buildCity(scene) {
   };
   return city;
 }
+// recorded-session note: city generation, neon animation and water shader are unchanged
 

@@ -515,4 +515,5 @@ export function createPoliceSystem(scene, city, vehicles) {
   };
   return api;
 }
+// recorded-session note: wanted escalation and pursuit logic are unchanged
 

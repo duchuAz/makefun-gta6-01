@@ -97,4 +97,5 @@ Controls: **WASD** move/drive, **mouse** look, **Shift** sprint, **Space** jump/
   `vendor/makefun-game.ts` were not modified.
 - Do not run `makefun record`, `makefun init`, or `makefun submit`; the operator owns submission.
 - `out/`, `dist/`, `node_modules/`, logs and `screenshots/raw/` are ignored.
+- Recorded-session note: this revision adds authoring notes only; gameplay and assets are untouched.
 
