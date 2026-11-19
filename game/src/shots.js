@@ -180,29 +180,43 @@ export function stageShot(name, ctx) {
   ctx.world.setMood('golden', ctx.city);
 
   if (name === 'cover') {
-    ctx.world.setMood('golden', ctx.city);
-    posePlayer(ctx, -17.5, -87.5, 0.75, { aiming: false, weapon: 'pistol' });
-    const mint = stageCar(ctx, 'sports', 0x7de8c8, -24.5, -90.5, 1.52, 0, { parked: true });
-    mint.label = 'MINT SOLAR GT';
-    stageTraffic(ctx, 'taxi', 0xf2c541, -70, -90, Math.PI / 2, 8);
-    stageTraffic(ctx, 'sedan', 0xe8d8c8, 22, -101, -Math.PI / 2, 7);
-    stageTraffic(ctx, 'muscle', 0x7b61c9, 15, -91, -Math.PI / 2, 9);
-    stagePed(ctx, -3, -91, -1.3, false, 0);
-    stagePed(ctx, -34, -84, 2.6, false, 1);
-    stagePed(ctx, -40, -93, 0.7, false, 2);
-    stagePalm(ctx, -43, -78, 1.15);
-    stagePalm(ctx, -4, -108, 1.0);
-    cameraAt(ctx, [-9.5, 1.9, -79.5], [-25, 7.2, -96], 58);
-    ctx.hud.setHealth(100, 62);
-    ctx.hud.setCash(1280);
-    ctx.hud.setWanted(0, 0);
-    ctx.hud.setWeapon('pistol', 12, 60);
-    ctx.hud.setMission(null);
+    // Cover: the chase itself — player driving, PVPD units behind, mission on screen.
+    ctx.world.setMood('chase', ctx.city);
+    const playerCar = stageCar(ctx, 'sports', 0xe86a5c, -3.2, 58, Math.PI, 27);
+    playerCar.driver = 'player';
+    ctx.vehicles.active = playerCar;
+    ctx.player.state.inCar = playerCar;
+    ctx.player.state.x = playerCar.x;
+    ctx.player.state.z = playerCar.z;
+    ctx.player.state.heading = playerCar.heading;
+    ctx.player.group.visible = false;
+    ctx.player.syncWeapon();
+    stageCruiser(ctx, -7.5, 68, Math.PI, 27);
+    stageCruiser(ctx, 4.2, 73, Math.PI, 27);
+    stageCruiser(ctx, -2.4, 81, Math.PI, 27);
+    stageTraffic(ctx, 'sedan', 0xf6e5b8, 3.6, 92, Math.PI, 16);
+    stageTraffic(ctx, 'van', 0xbfe3d0, -3.4, 108, Math.PI, 16);
+    stageTraffic(ctx, 'taxi', 0xf2c541, 3.6, 18, 0, 12);
+    stageTraffic(ctx, 'muscle', 0x7b61c9, -3.5, 8, 0, 12);
+    stagePed(ctx, 12, 64, 0.4, true, 0);
+    stagePed(ctx, 15, 50, 2.8, true, 1);
+    stagePed(ctx, -13, 46, -0.6, false, 2);
+    stagePalm(ctx, 16, 42, 1.1);
+    stagePalm(ctx, -18, 34, 1.0);
+    cameraAt(ctx, [9.5, 4.6, 40], [-2, 1.5, 70], 54);
+    ctx.hud.setHealth(86, 24);
+    ctx.hud.setCash(2140);
+    ctx.hud.setWanted(4, 0.4);
+    ctx.hud.setWeapon('smg', 24, 120);
+    ctx.hud.setMission(2, 'BADGE PROBLEMS', 'Lose the PVPD units and reach the marina', 600);
+    ctx.hud.setObjective('Lose the 3 PVPD units and reach the marina');
+    ctx.hud.dialogue('PVPD DISPATCH', 'All units, suspect in a red sports car heading west — 3 units in pursuit.', 10);
     ctx.hud.setPrompt(null);
-    ctx.hud.setSpeed(0, 'P', false);
-    ctx.hud.setClock(18 * 3600 + 41 * 60);
-    ctx.hud.setDistrict('NEON STRIP');
-    setRadio(ctx, 0);
+    ctx.hud.setSpeed(104, 'D', true);
+    ctx.hud.setClock(19 * 3600 + 12 * 60);
+    ctx.hud.setDistrict('DOWNTOWN');
+    setRadio(ctx, 1);
+    ctx.hud.toast('PVPD PURSUIT · 3 UNITS', 'wanted', 60);
 
   } else if (name === 'chase') {
     ctx.world.setMood('chase', ctx.city);

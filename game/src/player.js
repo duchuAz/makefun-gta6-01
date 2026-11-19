@@ -127,6 +127,7 @@ export function createPlayer(scene) {
     inCar: null,
     aiming: false,
     sprinting: false,
+    crouch: false,
     fireCooldown: 0,
     reloadTimer: 0,
     walkPhase: 0,
@@ -271,7 +272,7 @@ export function createPlayer(scene) {
       mz /= mag;
     }
     state.sprinting = input.sprint?.() && mag > 0 && !state.aiming;
-    let targetSpeed = state.aiming ? PLAYER.walkSpeed * 0.62 : state.sprinting ? PLAYER.sprintSpeed : PLAYER.walkSpeed;
+    let targetSpeed = state.crouch ? PLAYER.walkSpeed * 0.45 : state.aiming ? PLAYER.walkSpeed * 0.62 : state.sprinting ? PLAYER.sprintSpeed : PLAYER.walkSpeed;
     if (state.health < 25) targetSpeed *= 0.86;
     const desiredVx = mx * targetSpeed * (mag > 0 ? 1 : 0);
     const desiredVz = mz * targetSpeed * (mag > 0 ? 1 : 0);
@@ -341,7 +342,7 @@ export function createPlayer(scene) {
     }
     bobTime += dt * speed;
     const bob = Math.abs(Math.sin(bobTime * 2.2)) * 0.03 * Math.min(1, move);
-    body.position.y = bob;
+    body.position.y = bob + (state.crouch ? -0.3 : 0);
     head.rotation.x = aiming ? -0.05 : Math.sin(state.walkPhase * 0.5) * 0.02;
     weaponMount.visible = state.weapon !== 'fists' && !state.inCar;
     weaponMount.rotation.x = aiming ? 0 : 0.08;
@@ -369,6 +370,7 @@ export function createPlayer(scene) {
     currentSpec,
     reload,
     muzzleWorld,
+    bodyY: () => body.position.y,
     get reloading() { return state.reloadTimer > 0; },
     syncWeapon() { updateWeaponMesh(); },
   };
