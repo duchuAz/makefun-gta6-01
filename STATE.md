@@ -98,4 +98,5 @@ Controls: **WASD** move/drive, **mouse** look, **Shift** sprint, **Space** jump/
 - Do not run `makefun record`, `makefun init`, or `makefun submit`; the operator owns submission.
 - `out/`, `dist/`, `node_modules/`, logs and `screenshots/raw/` are ignored.
 - Recorded-session note: this revision adds authoring notes only; gameplay and assets are untouched.
+- Strict3 recorded-session note: this pass only adds comments; gameplay and assets are unchanged.
 

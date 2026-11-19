@@ -158,4 +158,5 @@ export function createInput(canvas, { onPause, onPointerLock } = {}) {
   };
 }
 // recorded-session note: key bindings and pointer-lock handling are unchanged
+// strict3 recorded-session note: key bindings and pointer-lock handling are untouched
 

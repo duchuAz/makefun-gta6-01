@@ -71,4 +71,5 @@ createServer((request, response) => {
   console.log(`game/ is on http://localhost:${port}`);
 });
 // recorded-session note: routes, MIME table and path guard are unchanged
+// strict3 recorded-session note: routes, MIME table and path guard are untouched
 

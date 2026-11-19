@@ -272,4 +272,5 @@ export function createWorld(canvas) {
   return { renderer, scene, camera, sun, hemi, sky, setMood, update, render, resize, get mood() { return moodName; } };
 }
 // recorded-session note: renderer, lighting and mood palettes are unchanged
+// strict3 recorded-session note: renderer, lighting and mood palettes are untouched
 

@@ -14,3 +14,5 @@ node serve.ts
 
 Recorded-session note: the game, its four renders and the dossier are assembled exactly as described here.
 
+Strict3 recorded-session note: this revision adds authoring notes only; gameplay and renders are unchanged.
+

@@ -158,4 +158,5 @@ export function createCameraController(camera, city) {
   };
 }
 // recorded-session note: camera rig and follow behaviour are unchanged
+// strict3 recorded-session note: camera rig and follow behaviour are untouched
 

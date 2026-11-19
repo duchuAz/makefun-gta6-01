@@ -1202,4 +1202,5 @@ export function buildDossier(dir: string, caps: DossierCaps): Uint8Array {
   return new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.length);
 }
 // recorded-session note: the vendored dossier builder's logic is untouched
+// strict3 recorded-session note: the vendored dossier builder's logic is unchanged
 

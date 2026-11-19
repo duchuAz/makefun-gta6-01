@@ -81,4 +81,5 @@ export function rayBoxXZ(ox, oz, dx, dz, minX, maxX, minZ, maxZ) {
   return tmin <= tmax && tmax >= 0 ? tmin : Infinity;
 }
 // recorded-session note: vector and ray helpers are unchanged
+// strict3 recorded-session note: vector and ray helpers are untouched
 

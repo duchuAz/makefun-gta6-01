@@ -306,4 +306,5 @@ export function stageShot(name, ctx) {
 
 export { mapState };
 // recorded-session note: the four staged screenshot scenes are unchanged
+// strict3 recorded-session note: the four staged screenshot scenes are untouched
 

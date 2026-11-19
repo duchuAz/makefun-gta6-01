@@ -453,4 +453,5 @@ export function createCombat(scene, city) {
   };
 }
 // recorded-session note: weapon, tracer and damage rules are unchanged
+// strict3 recorded-session note: weapon, tracer and damage rules are untouched
 

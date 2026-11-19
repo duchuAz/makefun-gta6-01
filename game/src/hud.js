@@ -271,4 +271,5 @@ export function createHUD() {
   };
 }
 // recorded-session note: HUD binding and overlays are unchanged
+// strict3 recorded-session note: HUD binding and overlays are untouched
 

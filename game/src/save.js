@@ -123,4 +123,5 @@ export function eraseGame() {
   }
 }
 // recorded-session note: save keys and storage behaviour are unchanged
+// strict3 recorded-session note: save keys and storage behaviour are untouched
 

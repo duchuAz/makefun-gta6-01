@@ -505,4 +505,5 @@ export function createMissions(scene, city) {
   return api;
 }
 // recorded-session note: mission steps, markers and rewards are unchanged
+// strict3 recorded-session note: mission steps, markers and rewards are untouched
 

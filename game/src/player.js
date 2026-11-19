@@ -376,4 +376,5 @@ export function createPlayer(scene) {
   };
 }
 // recorded-session note: movement, aiming and weapon state are unchanged
+// strict3 recorded-session note: movement, aiming and weapon state are untouched
 
