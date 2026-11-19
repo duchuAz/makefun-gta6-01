@@ -19,7 +19,8 @@ import { createAudio } from './audio.js';
 import { createInput } from './input.js';
 import { loadSettings, saveSettings, hasSave, loadGame, writeGame, eraseGame } from './save.js';
 import { stageShot, mapState } from './shots.js';
-
+// Every uncaught failure lands here so the smoke test can report a clean run. The cap keeps a
+// runaway error loop from growing the array without bound.
 window.__errors = [];
 function recordError(message, source = '') {
   const text = String(message);
@@ -27,17 +28,22 @@ function recordError(message, source = '') {
   if (window.__errors.length > 30) window.__errors.shift();
 }
 window.addEventListener('error', (event) => recordError(event.message, 'error'));
-window.addEventListener('unhandledrejection', (event) => recordError(event.reason?.message ?? event.reason, 'rejection'));
+window.addEventListener('unhandledrejection', (event) => {
+  recordError(event.reason?.message ?? event.reason, 'rejection');
+});
 const originalConsoleError = console.error.bind(console);
 console.error = (...args) => {
-  recordError(args.map((a) => (a instanceof Error ? a.message : String(a))).join(' '), 'console');
+  recordError(
+    args.map((value) => (value instanceof Error ? value.message : String(value))).join(' '),
+    'console',
+  );
   originalConsoleError(...args);
 };
-
 const params = new URLSearchParams(window.location.search);
 const shotName = params.get('shot');
 const smokeMode = params.get('smoke') === '1';
 const canvas = document.getElementById('game');
+// Cached DOM nodes for the parts of the shell main.js touches directly.
 const el = {
   loading: document.getElementById('loading-screen'),
   title: document.getElementById('title-screen'),
@@ -52,7 +58,7 @@ const el = {
   optHints: document.getElementById('opt-hints'),
   optSens: document.getElementById('opt-sens'),
 };
-
+// Build order is deliberate: renderer, city, player, then the systems that depend on both.
 const world = createWorld(canvas);
 const city = buildCity(world.scene);
 const player = createPlayer(world.scene);
@@ -66,7 +72,6 @@ const hud = createHUD();
 const minimap = createMinimap(document.getElementById('minimap'), city);
 const audio = createAudio();
 const settings = loadSettings();
-
 const stats = { missions: 0, arrests: 0, distance: 0, takedowns: 0 };
 let mode = shotName ? 'shot' : smokeMode ? 'smoke' : 'title';
 let mapOpen = false;
@@ -86,14 +91,28 @@ let accumulator = 0;
 let hudRefreshAccumulator = 0;
 let engineState = false;
 let frameCount = 0;
-
+// The shared context object handed to every system. Systems read and write through this, which
+// keeps main.js from having to pass a dozen arguments at each call site.
 const ctx = {
-  world, city, player, vehicles, traffic, police, combat, missions, cameraCtl, hud, minimap, audio, stats, settings,
+  world,
+  city,
+  player,
+  vehicles,
+  traffic,
+  police,
+  combat,
+  missions,
+  cameraCtl,
+  hud,
+  minimap,
+  audio,
+  stats,
+  settings,
   camera: world.camera,
   playerCar: null,
   onBusted: () => handleDeath('busted'),
 };
-
+/** District label for the HUD; the thresholds match the map's painted regions. */
 function areaName(x, z) {
   if (x > 260) return 'PUENTE VISTA';
   if (x > 198) return 'COSTA DORADA';
@@ -104,13 +123,13 @@ function areaName(x, z) {
   if (x > 108) return 'COSTA DORADA';
   return 'PALMA VISTA';
 }
-
+/** Restores both weapons to their starting magazines. */
 function resetWeapons() {
   player.state.weapons.pistol = { ammo: WEAPONS.pistol.ammo, reserve: WEAPONS.pistol.reserve };
   player.state.weapons.smg = { ammo: WEAPONS.smg.ammo, reserve: WEAPONS.smg.reserve };
   player.setWeapon(PLAYER.startWeapon);
 }
-
+/** Pushes the settings object into audio, input and the settings panel, then persists it. */
 function applySettings() {
   audio.setEnabled(settings.audio);
   audio.setRadio(settings.music);
@@ -123,14 +142,14 @@ function applySettings() {
   hud.el.hint.style.display = settings.showHints ? '' : 'none';
   saveSettings(settings);
 }
-
+/** Enables or disables the Continue button based on localStorage. */
 function refreshContinue() {
   const saved = hasSave();
   el.btnContinue.disabled = !saved;
   el.btnContinue.style.opacity = saved ? '1' : '0.45';
   el.btnContinue.textContent = saved ? 'CONTINUE' : 'NO SAVE YET';
 }
-
+/** Shows one of the four shell screens, or none when name is falsy. */
 function showScreen(name) {
   for (const key of ['title', 'pause', 'settings', 'controls']) {
     el[key].classList.toggle('hidden', key !== name);
@@ -142,7 +161,11 @@ function showScreen(name) {
     el.controls.classList.add('hidden');
   }
 }
-
+/**
+ * Starts a fresh run or restores a save. Returns false when Continue was pressed with no save.
+ * The order below matters for save restores: weapons are rebuilt before the saved loadout is
+ * layered on, and the world is only cleared after the player state is in place.
+ */
 function startGame({ fromSave = false, lock = true, silent = false } = {}) {
   const data = fromSave ? loadGame() : null;
   if (fromSave && !data) {
@@ -164,7 +187,11 @@ function startGame({ fromSave = false, lock = true, silent = false } = {}) {
     stats.arrests = 0;
     stats.distance = 0;
   } else {
-    player.reset(data.player?.x ?? SPAWN.x, data.player?.z ?? SPAWN.z, data.player?.heading ?? SPAWN.heading);
+    player.reset(
+      data.player?.x ?? SPAWN.x,
+      data.player?.z ?? SPAWN.z,
+      data.player?.heading ?? SPAWN.heading,
+    );
     player.state.y = data.player?.y ?? 0.1;
     player.state.health = data.player?.health ?? PLAYER.maxHealth;
     player.state.armor = data.player?.armor ?? 0;
@@ -174,10 +201,15 @@ function startGame({ fromSave = false, lock = true, silent = false } = {}) {
       for (const name of ['pistol', 'smg']) {
         const pocket = data.weapons[name];
         if (pocket && Number.isFinite(pocket.ammo) && Number.isFinite(pocket.reserve)) {
-          player.state.weapons[name] = { ammo: clamp(pocket.ammo, 0, 999), reserve: clamp(pocket.reserve, 0, 999) };
+          player.state.weapons[name] = {
+            ammo: clamp(pocket.ammo, 0, 999),
+            reserve: clamp(pocket.reserve, 0, 999),
+          };
         }
       }
-      if (['fists', 'pistol', 'smg'].includes(data.weapons.current)) player.setWeapon(data.weapons.current);
+      if (['fists', 'pistol', 'smg'].includes(data.weapons.current)) {
+        player.setWeapon(data.weapons.current);
+      }
     }
     missions.setIndex(data.missionIndex ?? 0);
     lastMissionIndex = missions.index;
@@ -217,13 +249,19 @@ function startGame({ fromSave = false, lock = true, silent = false } = {}) {
   refreshContinue();
   if (!silent) {
     hud.toast(fromSave ? 'SAVE LOADED' : 'WELCOME TO PALMA VISTA', 'mission');
-    hud.dialogue('LUNA', fromSave ? 'Back on the street. The city did not wait for you.' : 'Rico. Wake up. There is a package at the marina and a clock already running.', 5);
+    hud.dialogue(
+      'LUNA',
+      fromSave
+        ? 'Back on the street. The city did not wait for you.'
+        : 'Rico. Wake up. There is a package at the marina and a clock already running.',
+      5,
+    );
     if (lock) input?.lock();
   }
   started = true;
   return true;
 }
-
+/** Writes the current run to localStorage and refreshes the Continue label. */
 function saveProgress(silent = false) {
   const ok = writeGame({
     cash: player.state.cash,
@@ -231,8 +269,12 @@ function saveProgress(silent = false) {
     missionStep: missions.stepIndex,
     missionActive: Boolean(missions.active),
     player: {
-      x: player.state.x, y: player.state.y, z: player.state.z,
-      heading: player.state.heading, health: player.state.health, armor: player.state.armor,
+      x: player.state.x,
+      y: player.state.y,
+      z: player.state.z,
+      heading: player.state.heading,
+      health: player.state.health,
+      armor: player.state.armor,
     },
     weapons: {
       current: player.state.weapon,
@@ -247,7 +289,7 @@ function saveProgress(silent = false) {
   refreshContinue();
   return ok;
 }
-
+/** Returns to the title screen and silences every looping audio bed. */
 function showTitle() {
   mode = 'title';
   started = false;
@@ -272,7 +314,7 @@ function showTitle() {
   audio.setAmbient(false);
   input?.unlock();
 }
-
+/** Pauses only from active play, and never while the map or a death screen owns the frame. */
 function pauseGame() {
   if (mode !== 'play' || mapOpen || deathState) return;
   mode = 'pause';
@@ -287,7 +329,6 @@ function pauseGame() {
   audio.setSkid(false);
   audio.setSiren(false);
 }
-
 function resumeGame() {
   if (mode !== 'pause' && mode !== 'settings') return;
   mode = 'play';
@@ -296,7 +337,6 @@ function resumeGame() {
   input?.lock();
   audio.setAmbient(true);
 }
-
 function openSettings(from) {
   settingsReturn = from;
   mode = 'settings';
@@ -305,7 +345,6 @@ function openSettings(from) {
   audio.setSiren(false);
   input?.unlock();
 }
-
 function closeSettings() {
   saveSettings(settings);
   if (settingsReturn === 'pause') {
@@ -315,14 +354,12 @@ function closeSettings() {
     showTitle();
   }
 }
-
 function openControls(from) {
   settingsReturn = from;
   mode = 'controls';
   showScreen('controls');
   input?.unlock();
 }
-
 function closeControls() {
   if (settingsReturn === 'pause') {
     mode = 'pause';
@@ -331,7 +368,7 @@ function closeControls() {
     showTitle();
   }
 }
-
+/** Toggles the full-screen map; opening it releases the pointer, closing re-captures it. */
 function toggleMap() {
   if (mode !== 'play' && !mapOpen) return;
   mapOpen = !mapOpen;
@@ -345,18 +382,28 @@ function toggleMap() {
     input?.lock();
   }
 }
-
-function enterNearestCar() {
-  let best = vehicles.nearest(player.state.x, player.state.z, 4.6);
-  let bestD = best ? dist(player.state.x, player.state.z, best.x, best.z) : Infinity;
-  const trafficCar = traffic.nearestCar(player.state.x, player.state.z, 4.6);
+/**
+ * Finds the closest enterable car among the player's own fleet and ambient traffic. Shared by
+ * the prompt and the interact handler so both agree on what the player is looking at.
+ */
+function nearestEnterableCar(maxDistance = 4.6) {
+  let best = vehicles.nearest(player.state.x, player.state.z, maxDistance);
+  let bestDistance = best
+    ? dist(player.state.x, player.state.z, best.x, best.z)
+    : Infinity;
+  const trafficCar = traffic.nearestCar(player.state.x, player.state.z, maxDistance);
   if (trafficCar) {
-    const d = dist(player.state.x, player.state.z, trafficCar.x, trafficCar.z);
-    if (d < bestD) {
+    const trafficDistance = dist(player.state.x, player.state.z, trafficCar.x, trafficCar.z);
+    if (trafficDistance < bestDistance) {
       best = trafficCar;
-      bestD = d;
+      bestDistance = trafficDistance;
     }
   }
+  return best;
+}
+/** Steals or enters the nearest car, applying the appropriate wanted heat. */
+function enterNearestCar() {
+  const best = nearestEnterableCar();
   if (!best) return false;
   if (best.driver === 'traffic') {
     traffic.detach(best);
@@ -375,18 +422,16 @@ function enterNearestCar() {
   }
   return ok;
 }
-
 function exitCar() {
   const car = vehicles.exit(player);
-  if (car) {
-    player.group.visible = true;
-    player.syncWeapon();
-    cameraCtl.reset();
-    audio.setEngine(false);
-    audio.setSkid(false);
-  }
+  if (!car) return;
+  player.group.visible = true;
+  player.syncWeapon();
+  cameraCtl.reset();
+  audio.setEngine(false);
+  audio.setSkid(false);
 }
-
+/** Starts the wasted/busted sequence; the actual respawn happens after the timer runs out. */
 function handleDeath(kind) {
   if (deathState) return;
   if (player.state.inCar) exitCar();
@@ -409,7 +454,7 @@ function handleDeath(kind) {
   audio.setSkid(false);
   audio.setSiren(false);
 }
-
+/** Hospital or police-station respawn, with the cash and weapon penalties. */
 function respawn() {
   const kind = deathState.kind;
   deathState = null;
@@ -442,44 +487,41 @@ function respawn() {
   saveProgress(true);
   if (!smokeMode) input?.lock();
 }
-
+/** The contextual interaction prompt shown at the bottom of the HUD. */
 function playerPrompt() {
   if (mode !== 'play') return null;
   if (player.state.inCar) return 'EXIT VEHICLE';
   if (missions.nearStart) return `START MISSION ${missions.index + 1}`;
-  let best = vehicles.nearest(player.state.x, player.state.z, 4.6);
-  let bestD = best ? dist(player.state.x, player.state.z, best.x, best.z) : Infinity;
-  const trafficCar = traffic.nearestCar(player.state.x, player.state.z, 4.6);
-  if (trafficCar) {
-    const d = dist(player.state.x, player.state.z, trafficCar.x, trafficCar.z);
-    if (d < bestD) { best = trafficCar; bestD = d; }
-  }
+  const best = nearestEnterableCar();
   if (best) return best.driver === 'traffic' ? 'STEAL VEHICLE' : 'ENTER VEHICLE';
   return null;
 }
-
+/**
+ * Car-versus-car contact. Positions are separated first, then hard relative speeds apply
+ * damage to both cars and raise heat for reckless driving.
+ */
 function carCollisions(dt) {
   const active = player.state.inCar;
   if (!active) return;
-  const all = [...traffic.cars, ...police.cruisers];
-  for (const other of all) {
+  const allCars = [...traffic.cars, ...police.cruisers];
+  for (const other of allCars) {
     if (other === active || other.dead) continue;
     const dx = active.x - other.x;
     const dz = active.z - other.z;
-    const d = Math.hypot(dx, dz);
-    if (d > 3.15 || d < 0.001) continue;
-    const nx = dx / d;
-    const nz = dz / d;
-    const overlap = 3.15 - d;
-    active.x += nx * overlap * 0.55;
-    active.z += nz * overlap * 0.55;
-    other.x -= nx * overlap * 0.45;
-    other.z -= nz * overlap * 0.45;
-    const rel = Math.hypot(active.vx - (other.vx ?? 0), active.vz - (other.vz ?? 0));
-    if (rel > 7 && !(other.hitTimer > 0)) {
+    const distance = Math.hypot(dx, dz);
+    if (distance > 3.15 || distance < 0.001) continue;
+    const normalX = dx / distance;
+    const normalZ = dz / distance;
+    const overlap = 3.15 - distance;
+    active.x += normalX * overlap * 0.55;
+    active.z += normalZ * overlap * 0.55;
+    other.x -= normalX * overlap * 0.45;
+    other.z -= normalZ * overlap * 0.45;
+    const relativeSpeed = Math.hypot(active.vx - (other.vx ?? 0), active.vz - (other.vz ?? 0));
+    if (relativeSpeed > 7 && !(other.hitTimer > 0)) {
       other.hitTimer = 0.8;
-      vehicles.damageCar(active, rel * 0.7, ctx);
-      vehicles.damageCar(other, rel * 1.1, ctx);
+      vehicles.damageCar(active, relativeSpeed * 0.7, ctx);
+      vehicles.damageCar(other, relativeSpeed * 1.1, ctx);
       audio.impact();
       cameraCtl.shake(0.55);
       if (other.driver === 'traffic') other.speed = Math.max(0, other.speed * 0.4);
@@ -487,10 +529,12 @@ function carCollisions(dt) {
     }
   }
   for (const list of [traffic.cars, police.cruisers]) {
-    for (const car of list) if (car.hitTimer > 0) car.hitTimer -= dt;
+    for (const car of list) {
+      if (car.hitTimer > 0) car.hitTimer -= dt;
+    }
   }
 }
-
+/** Running people and gangsters over while driving. Cooldown prevents multi-hits per pass. */
 function pedCollisions() {
   const car = player.state.inCar;
   if (!car || car.speed < 4) return;
@@ -516,7 +560,7 @@ function pedCollisions() {
     }
   }
 }
-
+/** Refreshes every HUD element and both map views once per simulation step. */
 function updateHUD(dt) {
   hud.setHealth(player.state.health, player.state.armor);
   hud.setCash(player.state.cash);
@@ -536,7 +580,7 @@ function updateHUD(dt) {
   minimap.draw(mapState(ctx));
   if (mapOpen) minimap.drawFull(el.mapCanvas, mapState(ctx));
 }
-
+/** One fixed simulation step while playing or dying. */
 function gameplayUpdate(dt) {
   if (!started) return;
   gameTime = (gameTime + dt * 0.5) % 86400;
@@ -545,7 +589,12 @@ function gameplayUpdate(dt) {
     deathState.timer -= dt;
     player.state.vx = 0;
     player.state.vz = 0;
-    player.update(dt, { input: input ?? emptyInput, city, cameraYaw: cameraCtl.state.yaw, frozen: true });
+    player.update(dt, {
+      input: input ?? emptyInput,
+      city,
+      cameraYaw: cameraCtl.state.yaw,
+      frozen: true,
+    });
     traffic.update(dt, { player, activeCar: null, wanted: police.wanted });
     world.update(dt);
     city.update(gameTime, dt);
@@ -556,10 +605,18 @@ function gameplayUpdate(dt) {
   }
   const look = input.look();
   cameraCtl.look(look.dx, look.dy);
-
-  if (input.weapon1()) { player.setWeapon('pistol'); audio.ui(1); }
-  if (input.weapon2()) { player.setWeapon('smg'); audio.ui(1); }
-  if (input.weapon3()) { player.setWeapon('fists'); audio.ui(1); }
+  if (input.weapon1()) {
+    player.setWeapon('pistol');
+    audio.ui(1);
+  }
+  if (input.weapon2()) {
+    player.setWeapon('smg');
+    audio.ui(1);
+  }
+  if (input.weapon3()) {
+    player.setWeapon('fists');
+    audio.ui(1);
+  }
   if (input.reload()) player.reload();
   if (input.stationPrev()) {
     const station = audio.nextStation(-1);
@@ -573,7 +630,6 @@ function gameplayUpdate(dt) {
     hud.toast(`${station.name} · ${station.genre}`, 'good');
     saveSettings(settings);
   }
-
   const car = player.state.inCar;
   if (car) {
     const throttle = (input.forward() ? 1 : 0) - (input.back() ? 1 : 0);
@@ -622,7 +678,6 @@ function gameplayUpdate(dt) {
     }
     cameraCtl.update(dt, { player, car: null, aiming: player.state.aiming, speed: 0 });
   }
-
   if (!player.state.inCar && player.state.alive && player.state.health <= 0) {
     handleDeath('wasted');
   }
@@ -631,7 +686,6 @@ function gameplayUpdate(dt) {
     player.state.vx = 0;
     player.state.vz = 0;
   }
-
   vehicles.update(dt, ctx);
   traffic.update(dt, { player, activeCar: player.state.inCar, wanted: police.wanted });
   police.update(dt, ctx);
@@ -639,7 +693,6 @@ function gameplayUpdate(dt) {
   missions.update(dt, ctx);
   carCollisions(dt);
   pedCollisions();
-
   if (missions.index > lastMissionIndex) {
     lastMissionIndex = missions.index;
     stats.missions = Math.max(stats.missions, missions.index);
@@ -650,18 +703,20 @@ function gameplayUpdate(dt) {
     autosaveTimer = 60;
     saveProgress(true);
   }
-
   world.update(dt);
   city.update(gameTime, dt);
   updateHUD(dt);
 }
-
+/** Title screen: let the city breathe while the camera drifts over it. */
 function emptyUpdate() {
-  // Title screen: let the city breathe while the camera drifts over it.
   titleTime += 1 / 60;
-  const a = titleTime * 0.035 + 0.5;
+  const angle = titleTime * 0.035 + 0.5;
   const radius = 225;
-  world.camera.position.set(Math.cos(a) * radius, 64 + Math.sin(titleTime * 0.11) * 8, Math.sin(a) * radius - 30);
+  world.camera.position.set(
+    Math.cos(angle) * radius,
+    64 + Math.sin(titleTime * 0.11) * 8,
+    Math.sin(angle) * radius - 30,
+  );
   world.camera.lookAt(-8, 18, -18);
   world.camera.fov = 50;
   world.camera.updateProjectionMatrix();
@@ -670,24 +725,22 @@ function emptyUpdate() {
   city.update(gameTime + titleTime * 0.4, 1 / 60);
   world.update(1 / 60);
 }
-
 // ---------------------------------------------------------------- input and screens
-
 input = createInput(canvas, {
   onPointerLock: (locked) => {
     if (!locked && mode === 'play' && !mapOpen && !deathState && !shotName) pauseGame();
   },
 });
-
+/** Binds a click handler that starts audio and stops the event reaching the canvas. */
 function bindButton(id, handler) {
   const node = document.getElementById(id);
-  if (node) node.addEventListener('click', (event) => {
+  if (!node) return;
+  node.addEventListener('click', (event) => {
     event.stopPropagation();
     audio.ensure();
     handler();
   });
 }
-
 bindButton('btn-new', () => {
   audio.ensure();
   audio.setAmbient(true);
@@ -703,7 +756,9 @@ bindButton('btn-settings', () => openSettings('title'));
 bindButton('btn-settings-back', closeSettings);
 bindButton('btn-controls-back', closeControls);
 bindButton('btn-resume', resumeGame);
-bindButton('btn-save', () => { saveProgress(false); });
+bindButton('btn-save', () => {
+  saveProgress(false);
+});
 bindButton('btn-load', () => {
   if (hasSave()) startGame({ fromSave: true });
   else hud.toast('NO SAVE FOUND', 'warn');
@@ -712,7 +767,7 @@ bindButton('btn-pause-settings', () => openSettings('pause'));
 bindButton('btn-quit', () => {
   showTitle();
 });
-
+/** Flips one boolean setting, reapplies it, then runs an optional follow-up. */
 function bindSwitch(node, key, after = null) {
   node.addEventListener('click', (event) => {
     event.stopPropagation();
@@ -729,11 +784,9 @@ el.optSens.addEventListener('input', () => {
   if (input) input.sensitivity = settings.sensitivity;
   saveSettings(settings);
 });
-
 document.addEventListener('visibilitychange', () => {
   if (document.hidden && mode === 'play') pauseGame();
 });
-
 // Start the title music on the first gesture, as browsers require.
 let firstGesture = false;
 const gesture = () => {
@@ -745,9 +798,7 @@ const gesture = () => {
 };
 window.addEventListener('pointerdown', gesture, { once: true });
 window.addEventListener('keydown', gesture, { once: true });
-
 // ---------------------------------------------------------------- shot mode
-
 function beginShot() {
   mode = 'shot';
   showScreen(null);
@@ -756,19 +807,29 @@ function beginShot() {
   cameraCtl.reset();
   audio.setEnabled(false);
   audio.setAmbient(false);
-  world.setMood(shotName === 'chase' ? 'chase' : shotName === 'drive' ? 'drive' : shotName === 'mission' ? 'mission' : 'golden', city);
+  const mood = shotName === 'chase'
+    ? 'chase'
+    : shotName === 'drive'
+      ? 'drive'
+      : shotName === 'mission'
+        ? 'mission'
+        : 'golden';
+  world.setMood(mood, city);
   shotMapState = stageShot(shotName, ctx);
   document.title = `${GAME_TITLE} — ${shotName}`;
   window.__shotName = shotName;
 }
-
 function shotUpdate(dt) {
   shotFrames += 1;
   city.update(shotFrames / 60, dt);
   world.update(dt);
   for (const car of vehicles.cars) vehicles.animateCar(car, dt, car.speed || 0);
   for (const car of police.cruisers) vehicles.animateCar(car, dt, car.speed || 0);
-  cameraCtl.update(dt, { player, car: player.state.inCar, speed: player.state.inCar ? 1 : 0 });
+  cameraCtl.update(dt, {
+    player,
+    car: player.state.inCar,
+    speed: player.state.inCar ? 1 : 0,
+  });
   hud.update(dt);
   minimap.draw(mapState(ctx));
   if (shotFrames === 2) {
@@ -778,9 +839,7 @@ function shotUpdate(dt) {
     window.__shotReady = true;
   }
 }
-
 // ---------------------------------------------------------------- smoke mode
-
 function beginSmoke() {
   el.loading.style.display = 'none';
   smoke = {
@@ -809,12 +868,19 @@ function beginSmoke() {
   vehicles.animateCar(smoke.car, 1 / 60, 0);
   ctx.hud.toast('SMOKE TEST', 'mission');
 }
-
 function finishSmoke() {
   const results = smoke.results;
   results.errors = window.__errors;
   results.fpsMode = 'headless';
-  const pass = Boolean(results.started && results.enteredCar && results.drove && results.fired && results.ammoDropped && results.wanted && results.mission);
+  const pass = Boolean(
+    results.started
+    && results.enteredCar
+    && results.drove
+    && results.fired
+    && results.ammoDropped
+    && results.wanted
+    && results.mission,
+  );
   results.pass = pass;
   document.body.dataset.smoke = JSON.stringify(results);
   window.__smokeDone = true;
@@ -822,7 +888,7 @@ function finishSmoke() {
   smoke.done = true;
   smoke.results = results;
 }
-
+/** Scripted end-to-end check: title, car, drive, fire, wanted, mission. */
 function smokeUpdate(dt) {
   if (!smoke || smoke.done) return;
   smoke.time += dt;
@@ -850,7 +916,8 @@ function smokeUpdate(dt) {
   }
   if (smoke.stage === 2 && t > 2.1) {
     smoke.driving = false;
-    smoke.results.drove = Boolean(player.state.inCar) && dist(player.state.x, player.state.z, smoke.startX, smoke.startZ) > 3;
+    smoke.results.drove = Boolean(player.state.inCar)
+      && dist(player.state.x, player.state.z, smoke.startX, smoke.startZ) > 3;
     smoke.results.carSpeed = player.state.inCar?.speed ?? 0;
     exitCar();
     smoke.stage = 3;
@@ -888,9 +955,7 @@ function smokeUpdate(dt) {
     finishSmoke();
   }
 }
-
 // ---------------------------------------------------------------- main loop
-
 function frameBody(now) {
   frameCount += 1;
   const dt = Math.min((now - lastFrame) / 1000, 0.12);
@@ -902,8 +967,11 @@ function frameBody(now) {
   }
   if (mode === 'smoke') {
     // The headless smoke test runs faster than real time so software rendering cannot stall it.
-    if (smoke?.done) { world.render(); return; }
-    for (let i = 0; i < 30 && !smoke?.done; i++) {
+    if (smoke?.done) {
+      world.render();
+      return;
+    }
+    for (let step = 0; step < 30 && !smoke?.done; step++) {
       smokeUpdate(TIME.step);
       gameplayUpdate(TIME.step);
     }
@@ -963,12 +1031,12 @@ function frameBody(now) {
   world.render();
   if (!el.loading.dataset.hidden) {
     el.loading.dataset.hidden = '1';
-    setTimeout(() => { el.loading.style.display = 'none'; }, 250);
+    setTimeout(() => {
+      el.loading.style.display = 'none';
+    }, 250);
   }
 }
-
 // ---------------------------------------------------------------- boot
-
 applySettings();
 refreshContinue();
 showScreen('title');
@@ -983,7 +1051,6 @@ if (shotName) {
   world.setMood('title', city);
   audio.setAmbient(false);
 }
-
 // One warm-up render so shaders compile before the title appears.
 world.camera.position.set(120, 48, 120);
 world.camera.lookAt(0, 16, -20);
@@ -994,14 +1061,38 @@ world.render();
 if (shotName) {
   el.loading.style.display = 'none';
 }
-window.__palmaVista = { mode, shotName, smokeMode, world, city, player, missions, police, vehicles, traffic, combat, ctx };
+window.__palmaVista = {
+  mode,
+  shotName,
+  smokeMode,
+  world,
+  city,
+  player,
+  missions,
+  police,
+  vehicles,
+  traffic,
+  combat,
+  ctx,
+};
 window.__gameState = () => ({
-  mode, mapOpen, death: deathState?.kind ?? null, frameCount, started,
-  player: { x: player.state.x, y: player.state.y, z: player.state.z, heading: player.state.heading, inCar: Boolean(player.state.inCar) },
+  mode,
+  mapOpen,
+  death: deathState?.kind ?? null,
+  frameCount,
+  started,
+  player: {
+    x: player.state.x,
+    y: player.state.y,
+    z: player.state.z,
+    heading: player.state.heading,
+    inCar: Boolean(player.state.inCar),
+  },
   camera: world.camera.position.toArray(),
-  wanted: police.wanted, mission: missions.index, active: Boolean(missions.active),
+  wanted: police.wanted,
+  mission: missions.index,
+  active: Boolean(missions.active),
 });
-
 function frame(now) {
   requestAnimationFrame(frame);
   try {
@@ -1011,7 +1102,4 @@ function frame(now) {
     document.body.dataset.frameError = String(error?.message ?? error);
   }
 }
-
 requestAnimationFrame(frame);
-// recorded-session note: the fixed-step loop and scene boot order are unchanged
-
